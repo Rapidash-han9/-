@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>21세기 한국 영화 티어리스트</title>
+<style>
+  :root {
+    --bg: #15171c; --panel: #1e2128; --text: #e8e8e8;
+    --accent: #4da3ff; --border: #333842;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: "Segoe UI", "맑은 고딕", sans-serif;
+    background: var(--bg); color: var(--text); padding: 20px;
+  }
+  h1 { text-align: center; font-size: 1.6rem; }
+  .subtitle { text-align: center; color: #999; margin-bottom: 20px; }
+
+  /* 티어 행 */
+  .tier-row { display: flex; margin-bottom: 8px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .tier-label {
+    width: 70px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem; font-weight: bold; color: #111;
+  }
+  .tier-S { background: #ff7f7f; }
+  .tier-A { background: #ffbf7f; }
+  .tier-B { background: #ffdf7f; }
+  .tier-C { background: #bfff7f; }
+  .tier-D { background: #7fdfff; }
+  .drop-zone {
+    flex: 1; min-height: 70px; display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 6px; background: var(--panel);
+  }
+
+  /* 미배치 영화 보관함 */
+  .pool-title { margin: 20px 0 8px; font-size: 1.1rem; }
+  #pool { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px;
+    background: var(--panel); border: 1px dashed var(--border); border-radius: 6px; min-height: 60px; }
+
+  /* 영화 아이콘 */
+  .movie {
+    padding: 6px 10px; background: #2a2e37; border: 1px solid var(--border);
+    border-radius: 4px; cursor: grab; font-size: 0.85rem; user-select: none;
+  }
+  .movie:active { cursor: grabbing; }
+  .movie.dragging { opacity: 0.4; }
+  .drop-zone.over, #pool.over { outline: 2px dashed var(--accent); }
+
+  /* 버튼 */
+  .controls { text-align: center; margin: 20px 0; }
+  button {
+    background: var(--accent); color: #fff; border: none; padding: 10px 18px;
+    border-radius: 6px; cursor: pointer; font-size: 0.9rem; margin: 0 4px;
+  }
+  button:hover { opacity: 0.85; }
+  #shareUrl { width: 100%; margin-top: 10px; padding: 8px; background: var(--panel);
+    color: var(--text); border: 1px solid var(--border); border-radius: 4px; }
+
+  /* 댓글 */
+  .comments { max-width: 700px; margin: 30px auto; }
+  .comment { background: var(--panel); padding: 10px; border-radius: 6px; margin-bottom: 8px; }
+  .comment .name { color: var(--accent); font-weight: bold; }
+  .comment-form input, .comment-form textarea {
+    width: 100%; margin-bottom: 8px; padding: 8px; background: var(--panel);
+    color: var(--text); border: 1px solid var(--border); border-radius: 4px;
+  }
+</style>
+</head>
+<body>
+
+<h1>🎬 21세기 한국 영화 티어리스트</h1>
+<p class="subtitle">영화를 드래그해서 나만의 순위를 매겨보세요!</p>
+
+<div id="tiers">
+  <div class="tier-row"><div class="tier-label tier-S">S</div><div class="drop-zone" data-tier="S"></div></div>
+  <div class="tier-row"><div class="tier-label tier-A">A</div><div class="drop-zone" data-tier="A"></div></div>
+  <div class="tier-row"><div class="tier-label tier-B">B</div><div class="drop-zone" data-tier="B"></div></div>
+  <div class="tier-row"><div class="tier-label tier-C">C</div><div class="drop-zone" data-tier="C"></div></div>
+  <div class="tier-row"><div class="tier-label tier-D">D</div><div class="drop-zone" data-tier="D"></div></div>
+</div>
+
+<h2 class="pool-title">📦 미배치 영화 보관함</h2>
+<div id="pool" data-tier="pool"></div>
+
+<div class="controls">
+  <button onclick="generateShareUrl()">🔗 결과 공유 URL 만들기</button>
+  <button onclick="resetTiers()">🔄 초기화</button>
+  <input id="shareUrl" readonly placeholder="공유 URL이 여기에 생성됩니다" onclick="this.select()">
+</div>
+
+<div class="comments">
+  <h2>💬 토론 & 댓글</h2>
+  <div class="comment-form">
+    <input id="cName" placeholder="닉네임">
+    <textarea id="cText" rows="2" placeholder="이 티어리스트에 대한 의견을 남겨보세요"></textarea>
+    <button onclick="addComment()">댓글 등록</button>
+  </div>
+  <div id="commentList"></div>
+</div>
+
+<script>
+  // 영화 100선 (대표작 일부 샘플 + 예시 데이터)
+  const movies = [
+    "기생충","올드보이","괴물","부산행","살인의 추억","밀양","박쥐","추격자",
+    "아가씨","범죄와의 전쟁","곡성","택시운전사","1987","암살","베테랑",
+    "국제시장","왕의 남자","태극기 휘날리며","실미도","괴물","변호인","신과함께-죄와 벌",
+    "도둑들","광해, 왕이 된 남자","명량","해운대","설국열차","버닝","마더",
+    "헤어질 결심","남산의 부장들","기생수","브로커","헌트","모가디슈","승리호",
+    "다만 악에서 구하소서","엑시트","82년생 김지영","사바하","독전","공작","터널",
+    "내부자들","동주","검은 사제들","부당거래","의형제","좋은 놈 나쁜 놈 이상한 놈",
+    "타짜","달콤한 인생","봄 여름 가을 겨울 그리고 봄","오아시스","JSA 공동경비구역"
+  ];
+
+  const pool = document.getElementById("pool");
+
+  // 영화 아이콘 생성
+  function createMovieEl(name) {
+    const el = document.createElement("div");
+    el.className = "movie";
+    el.textContent = name;
+    el.draggable = true;
+    el.dataset.name = name;
+    el.addEventListener("dragstart", e => el.classList.add("dragging"));
+    el.addEventListener("dragend", e => el.classList.remove("dragging"));
+    return el;
+  }
+
+  // 초기 렌더링 (보관함에 모두 배치)
+  function renderInitial() {
+    movies.forEach(name => pool.appendChild(createMovieEl(name)));
+  }
+
+  // 모든 드롭 영역에 드래그 이벤트 연결
+  function setupDropZones() {
+    document.querySelectorAll(".drop-zone, #pool").forEach(zone => {
+      zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("over"); });
+      zone.addEventListener("dragleave", () => zone.classList.remove("over"));
+      zone.addEventListener("drop", e => {
+        e.preventDefault();
+        zone.classList.remove("over");
+        const dragging = document.querySelector(".dragging");
+        if (dragging) zone.appendChild(dragging);
+      });
+    });
+  }
+
+  // 공유 URL 생성: 현재 배치를 압축해 URL 해시에 저장
+  function generateShareUrl() {
+    const state = {};
+    document.querySelectorAll(".drop-zone").forEach(zone => {
+      const tier = zone.dataset.tier;
+      state[tier] = [...zone.querySelectorAll(".movie")].map(m => m.dataset.name);
+    });
+    const encoded = encodeURIComponent(JSON.stringify(state));
+    const url = location.origin + location.pathname + "#" + encoded;
+    document.getElementById("shareUrl").value = url;
+    // 클립보드 복사 시도
+    navigator.clipboard?.writeText(url);
+  }
+
+  // URL 해시에 저장된 배치 복원
+  function loadFromUrl() {
+    if (!location.hash) return;
+    try {
+      const state = JSON.parse(decodeURIComponent(location.hash.slice(1)));
+      // 일단 모든 영화를 이름->요소 맵으로
+      const allEls = {};
+      document.querySelectorAll(".movie").forEach(m => allEls[m.dataset.name] = m);
+      Object.entries(state).forEach(([tier, names]) => {
+        const zone = document.querySelector(`.drop-zone[data-tier="${tier}"]`);
+        if (!zone) return;
+        names.forEach(name => { if (allEls[name]) zone.appendChild(allEls[name]); });
+      });
+    } catch (e) {
+      console.warn("URL 복원 실패:", e);
+    }
+  }
+
+  // 초기화
+  function resetTiers() {
+    document.querySelectorAll(".movie").forEach(m => pool.appendChild(m));
+    document.getElementById("shareUrl").value = "";
+    location.hash = "";
+  }
+
+  // --- 댓글 (브라우저 로컬 저장) ---
+  function loadComments() {
+    const list = JSON.parse(localStorage.getItem("comments") || "[]");
+    const box = document.getElementById("commentList");
+    box.innerHTML = "";
+    list.forEach(c => {
+      const el = document.createElement("div");
+      el.className = "comment";
+      el.innerHTML = `<span class="name"></span>: <span class="text"></span>`;
+      el.querySelector(".name").textContent = c.name;   // XSS 방지: textContent 사용
+      el.querySelector(".text").textContent = c.text;
+      box.appendChild(el);
+    });
+  }
+  function addComment() {
+    const name = document.getElementById("cName").value.trim() || "익명";
+    const text = document.getElementById("cText").value.trim();
+    if (!text) { alert("댓글 내용을 입력해주세요!"); return; }
+    const list = JSON.parse(localStorage.getItem("comments") || "[]");
+    list.push({ name, text });
+    localStorage.setItem("comments", JSON.stringify(list));
+    document.getElementById("cText").value = "";
+    loadComments();
+  }
+
+  // 실행
+  renderInitial();
+  setupDropZones();
+  loadFromUrl();
+  loadComments();
+</script>
+</body>
+</html>

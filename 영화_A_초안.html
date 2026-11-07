@@ -1,0 +1,297 @@
+import base64
+
+# Define the HTML content as a string to be saved and provided to the user.
+html_content = """<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>21세기 한국 영화 티어리스트</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --card-bg: #2d2d2d;
+            --text-color: #ffffff;
+            --s-tier: #ff7f7f;
+            --a-tier: #ffbf7f;
+            --b-tier: #ffff7f;
+            --c-tier: #7fff7f;
+            --d-tier: #7fbfff;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { margin-bottom: 10px; }
+        p { color: #aaa; margin-bottom: 20px; }
+
+        /* 컨트롤 버튼 */
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #e50914;
+            color: white;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
+        button:hover { background-color: #b20710; }
+
+        /* 티어 구역 */
+        .tier-container {
+            width: 100%;
+            max-width: 1000px;
+            border: 2px solid #444;
+            margin-bottom: 30px;
+        }
+
+        .tier-row {
+            display: flex;
+            min-height: 100px;
+            border-bottom: 1px solid #444;
+            background-color: #111;
+        }
+
+        .tier-label {
+            width: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #000;
+            flex-shrink: 0;
+        }
+
+        .tier-dropzone {
+            flex-grow: 1;
+            display: flex;
+            flex-wrap: wrap;
+            padding: 10px;
+            gap: 10px;
+            min-height: 80px;
+        }
+
+        /* 티어별 색상 */
+        .s-label { background-color: var(--s-tier); }
+        .a-label { background-color: var(--a-tier); }
+        .b-label { background-color: var(--b-tier); }
+        .c-label { background-color: var(--c-tier); }
+        .d-label { background-color: var(--d-tier); }
+
+        /* 영화 아이템 */
+        .movie-pool {
+            width: 100%;
+            max-width: 1000px;
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .movie-card {
+            width: 80px;
+            height: 110px;
+            background-color: #444;
+            border-radius: 4px;
+            padding: 5px;
+            font-size: 11px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            user-select: none;
+            overflow: hidden;
+            word-break: keep-all;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .movie-card:active { cursor: grabbing; }
+
+        /* 공유 팝업 */
+        #share-modal {
+            display: none;
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: #333;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            z-index: 100;
+            text-align: center;
+        }
+
+        #share-url {
+            width: 300px;
+            padding: 10px;
+            margin: 10px 0;
+            background: #111;
+            color: #0f0;
+            border: 1px solid #555;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🎬 21세기 한국 영화 티어리스트</h1>
+    <p>영화 포스터(박스)를 드래그하여 티어에 배치하세요!</p>
+
+    <div class="controls">
+        <button onclick="saveAndShare()">저장 및 공유 링크 생성</button>
+        <button onclick="location.reload()" style="background-color: #555;">초기화</button>
+    </div>
+
+    <div class="tier-container">
+        <div class="tier-row">
+            <div class="tier-label s-label">S</div>
+            <div class="tier-dropzone" id="tier-s" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+        </div>
+        <div class="tier-row">
+            <div class="tier-label a-label">A</div>
+            <div class="tier-dropzone" id="tier-a" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+        </div>
+        <div class="tier-row">
+            <div class="tier-label b-label">B</div>
+            <div class="tier-dropzone" id="tier-b" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+        </div>
+        <div class="tier-row">
+            <div class="tier-label c-label">C</div>
+            <div class="tier-dropzone" id="tier-c" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+        </div>
+        <div class="tier-row">
+            <div class="tier-label d-label">D</div>
+            <div class="tier-dropzone" id="tier-d" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+        </div>
+    </div>
+
+    <h3>영화 목록 (100편)</h3>
+    <div class="movie-pool" id="movie-pool" ondrop="drop(event)" ondragover="allowDrop(event)">
+        <!-- 영화 카드가 여기에 생성됩니다 -->
+    </div>
+
+    <div id="share-modal">
+        <h3>공유 링크가 생성되었습니다!</h3>
+        <p>이 주소를 복사하여 친구들에게 공유하세요.</p>
+        <input type="text" id="share-url" readonly>
+        <br>
+        <button onclick="document.getElementById('share-modal').style.display='none'">닫기</button>
+    </div>
+
+    <script>
+        // 21세기 한국 영화 100선 데이터
+        const movies = [
+            "기생충", "올드보이", "살인의 추억", "괴물", "명량", "부산행", "신과함께", "극한직업", "택시운전사", "범죄도시",
+            "변호인", "해운대", "도둑들", "베테랑", "암살", "광해", "왕의 남자", "태극기 휘날리며", "실미도", "겨울왕국",
+            "국제시장", "내부자들", "곡성", "아가씨", "밀양", "시", "박쥐", "추격자", "황해", "범죄와의 전쟁",
+            "신세계", "부당거래", "마더", "설국열차", "옥자", "반도", "다만 악에서 구하소서", "남산의 부장들", "1987", "공조",
+            "청년경찰", "써니", "과속스캔들", "국가대표", "건축학개론", "내 머리속의 지우개", "엽기적인 그녀", "클래식", "장화, 홍련", "친절한 금자씨",
+            "싸이보그지만 괜찮아", "달콤한 인생", "장화 홍련", "지구를 지켜라", "공동경비구역 JSA", "오아시스", "박하사탕", "초록물고기", "넘버 3", "조용한 가족",
+            "반칙왕", "좋은 놈 나쁜 놈 이상한 놈", "밀정", "전우치", "타짜", "도둑들", "암살", "베를린", "공작", "헌트",
+            "헤어질 결심", "브로커", "버닝", "지푸라기라도 잡고 싶은 짐승들", "끝까지 간다", "더 테러 라이브", "감시자들", "의형제", "고지전", "공동경비구역 JSA",
+            "말죽거리 잔혹사", "비트", "태양은 없다", "친구", "신라의 달밤", "가문의 영광", "두사부일체", "색즉시공", "동갑내기 과외하기", "어린 신부",
+            "미녀는 괴로워", "과속스캔들", "써니", "수상한 그녀", "럭키", "엑시트", "스윙키즈", "영웅", "한산", "노량"
+        ];
+
+        // 초기 영화 목록 생성
+        const moviePool = document.getElementById('movie-pool');
+        movies.forEach((title, index) => {
+            const card = document.createElement('div');
+            card.className = 'movie-card';
+            card.draggable = true;
+            card.id = 'movie-' + index;
+            card.innerText = title;
+            card.ondragstart = drag;
+            moviePool.appendChild(card);
+        });
+
+        // 드래그 앤 드롭 로직
+        function allowDrop(ev) {
+            ev.preventDefault();
+        }
+
+        function drag(ev) {
+            ev.dataTransfer.setData("text", ev.target.id);
+        }
+
+        function drop(ev) {
+            ev.preventDefault();
+            const data = ev.dataTransfer.getData("text");
+            const draggedElement = document.getElementById(data);
+            
+            // 드롭 대상이 dropzone인지 확인 (자식 요소에 드롭되는 경우 방지)
+            let target = ev.target;
+            while (target && !target.classList.contains('tier-dropzone') && !target.classList.contains('movie-pool')) {
+                target = target.parentElement;
+            }
+            
+            if (target) {
+                target.appendChild(draggedElement);
+            }
+        }
+
+        // 저장 및 공유 기능 (Firebase 대신 URL Hash 사용 시뮬레이션)
+        function saveAndShare() {
+            const state = {};
+            const tiers = ['tier-s', 'tier-a', 'tier-b', 'tier-c', 'tier-d'];
+            
+            tiers.forEach(tierId => {
+                const tierEl = document.getElementById(tierId);
+                const movieIds = Array.from(tierEl.children).map(child => child.id);
+                state[tierId] = movieIds;
+            });
+
+            // 데이터를 문자열로 변환하여 URL에 포함 (Base64 인코딩)
+            const encodedState = btoa(encodeURIComponent(JSON.stringify(state)));
+            const shareUrl = window.location.origin + window.location.pathname + '#' + encodedState;
+            
+            document.getElementById('share-url').value = shareUrl;
+            document.getElementById('share-modal').style.display = 'block';
+        }
+
+        // 페이지 로드 시 URL에 저장된 데이터가 있는지 확인하여 복구
+        window.onload = function() {
+            const hash = window.location.hash.substring(1);
+            if (hash) {
+                try {
+                    const state = JSON.parse(decodeURIComponent(atob(hash)));
+                    for (const tierId in state) {
+                        const tierEl = document.getElementById(tierId);
+                        state[tierId].forEach(movieId => {
+                            const movieEl = document.getElementById(movieId);
+                            if (movieEl) tierEl.appendChild(movieEl);
+                        });
+                    }
+                } catch (e) {
+                    console.error("데이터 복구 실패", e);
+                }
+            }
+        };
+    </script>
+</body>
+</html>
+"""
+
+with open("movie_tier_list.html", "w", encoding="utf-8") as f:
+    f.write(html_content)
